@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lab System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{background:#f5f7fa;font-size:.92rem}
+    .topbar{background:#5c3317;color:#fff;padding:.6rem 1.2rem;display:flex;align-items:center;gap:1rem}
+    .topbar h1{font-size:1.1rem;margin:0;font-weight:600}
+    .card-section{background:#fff;border-radius:8px;border:1px solid #dde3ea;margin-bottom:1.2rem;overflow:hidden}
+    .cs-header{background:#f7f9fc;border-bottom:1px solid #dde3ea;padding:.55rem 1rem;font-weight:600;font-size:.85rem;color:#5c3317}
+    .cs-body{padding:1rem}
+    table{font-size:.82rem}
+    .mono{font-family:monospace;font-size:.75rem}
+    label{font-size:.82rem;font-weight:500;margin-bottom:.2rem}
+    .btn-primary{background:#5c3317;border-color:#5c3317}
+    .btn-primary:hover{background:#7d4720;border-color:#7d4720}
+    .dkg-badge{font-size:.7rem;padding:.15em .45em;border-radius:3px}
+    .dkg-ok{background:#d4edda;color:#155724}
+    .dkg-no{background:#f8d7da;color:#721c24}
+    .ref-range{color:#888;font-size:.78rem}
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🔬 Laboratory Information System</h1>
+</div>
+
+<div class="container-fluid px-4 py-3" style="max-width:1000px">
+
+  <!-- SUBMIT RESULT -->
+  <div class="card-section">
+    <div class="cs-header">Submit Lab Result</div>
+    <div class="cs-body">
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label>Patient ID</label>
+          <input id="l-pid" class="form-control form-control-sm" placeholder="Patient UUID">
+        </div>
+        <div class="col-md-3">
+          <label>Test (LOINC)</label>
+          <select id="l-loinc" class="form-select form-select-sm" onchange="updateLoincMeta()">
+            <option value="33914-3" data-metric="eGFR" data-unit="mL/min/1.73m²" data-formula="0">33914-3 — eGFR (CKD-EPI)</option>
+            <option value="2164-2"  data-metric="eGFR" data-unit="mL/min" data-formula="1">2164-2 — eGFR (Cockcroft-Gault)</option>
+            <option value="2823-3" data-metric="Potassium" data-unit="mmol/L" data-formula="2">2823-3 — Potassium</option>
+            <option value="2160-0" data-metric="Creatinine" data-unit="μmol/L" data-formula="2">2160-0 — Creatinine</option>
+          </select>
+        </div>
+        <div class="col-md-1">
+          <label>Value</label>
+          <input id="l-value" class="form-control form-control-sm" type="number" step="0.1" value="65">
+        </div>
+        <div class="col-md-2">
+          <label>Unit</label>
+          <input id="l-unit" class="form-control form-control-sm" value="mL/min/1.73m²">
+        </div>
+        <div class="col-md-2">
+          <label>Lab name</label>
+          <input id="l-lab" class="form-control form-control-sm" value="City Laboratory">
+        </div>
+      </div>
+      <div class="mt-3 d-flex gap-2 align-items-center">
+        <button class="btn btn-primary btn-sm" onclick="submitResult()">Submit &amp; Publish to DKG</button>
+        <span id="l-spin" class="d-none text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Publishing…</span>
+      </div>
+      <div id="l-msg" class="mt-2"></div>
+    </div>
+  </div>
+
+  <!-- RESULTS TABLE -->
+  <div class="card-section">
+    <div class="cs-header d-flex justify-content-between align-items-center">
+      Recent Results
+      <div class="d-flex gap-2">
+        <input id="filter-pid" class="form-control form-control-sm" placeholder="Filter by patient UUID" style="width:220px" oninput="filterResults()">
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadResults()">All</button>
+      </div>
+    </div>
+    <div class="cs-body p-0">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr><th>Patient</th><th>LOINC</th><th>Metric</th><th>Value</th><th>Unit</th><th>Lab</th><th>Date</th><th>DKG</th></tr>
+        </thead>
+        <tbody id="result-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API = '';
+let allResults = [];
+
+async function get(path){const r=await fetch(API+path);return r.json();}
+async function post(path,body){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){const t=await r.text();throw new Error(t);}return r.json();}
+
+function msg(id,html,type='success'){document.getElementById(id).innerHTML=`<div class="alert alert-${type} p-2 small mb-0">${html}</div>`;}
+
+function updateLoincMeta(){
+  const sel = document.getElementById('l-loinc');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('l-unit').value = opt.dataset.unit || '';
+}
+
+async function submitResult(){
+  const spin = document.getElementById('l-spin');
+  spin.classList.remove('d-none');
+  document.getElementById('l-msg').innerHTML='';
+  try{
+    const sel = document.getElementById('l-loinc');
+    const opt = sel.options[sel.selectedIndex];
+    const r = await post('/api/results',{
+      patientId: document.getElementById('l-pid').value,
+      loincCode: sel.value,
+      metric: opt.dataset.metric,
+      formula: parseInt(opt.dataset.formula),
+      value: parseFloat(document.getElementById('l-value').value),
+      unit: document.getElementById('l-unit').value,
+      measuredBy: document.getElementById('l-lab').value,
+    });
+    msg('l-msg',`Saved — DKG UAL: <span class="mono">${r.dkgUal||'(DKG unavailable)'}</span>`);
+    loadResults();
+  }catch(e){msg('l-msg',e.message,'danger');}
+  finally{spin.classList.add('d-none');}
+}
+
+async function loadResults(){
+  allResults = await get('/api/results');
+  renderResults(allResults);
+}
+
+function filterResults(){
+  const f = document.getElementById('filter-pid').value.toLowerCase();
+  renderResults(f ? allResults.filter(r=>r.patientId.toLowerCase().includes(f)) : allResults);
+}
+
+function renderResults(rows){
+  const tb = document.getElementById('result-list');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="8" class="text-center text-muted py-3">No results yet</td></tr>';return;}
+  tb.innerHTML = rows.map(r=>`
+    <tr>
+      <td class="mono" title="${r.patientId}">${r.patientId?.slice(0,8)}…
+        <button class="btn btn-link btn-sm p-0" onclick="navigator.clipboard.writeText('${r.patientId}')">📋</button>
+      </td>
+      <td>${r.loincCode}</td>
+      <td>${r.metric}</td>
+      <td><strong>${r.value}</strong></td>
+      <td>${r.unit}</td>
+      <td>${r.measuredBy}</td>
+      <td>${new Date(r.measuredAt).toLocaleDateString()}</td>
+      <td>
+        ${r.dkgUal
+          ? `<span class="dkg-badge dkg-ok" title="${r.dkgUal}">✓ DKG</span>`
+          : `<span class="dkg-badge dkg-no">— local</span>`}
+      </td>
+    </tr>`).join('');
+}
+
+loadResults();
+</script>
+</body>
+</html>

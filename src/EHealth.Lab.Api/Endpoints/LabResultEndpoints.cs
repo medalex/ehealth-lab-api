@@ -92,7 +92,7 @@ public static class LabResultEndpoints
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadFromJsonAsync<DkgResponse>();
-            return json?.UAL;
+            return json?.Data?.UAL ?? json?.UAL;
         }
         catch
         {
@@ -100,5 +100,6 @@ public static class LabResultEndpoints
         }
     }
 
-    private record DkgResponse(string UAL);
+    private record DkgData(string? UAL);
+    private record DkgResponse(string? UAL, DkgData? Data);
 }
