@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EHealth.Lab.Data;
 using EHealth.Lab.Models;
 using Microsoft.EntityFrameworkCore;
@@ -91,15 +92,25 @@ public static class LabResultEndpoints
 
             if (!response.IsSuccessStatusCode) return null;
 
-            var json = await response.Content.ReadFromJsonAsync<DkgResponse>();
-            return json?.Data?.UAL ?? json?.UAL;
+            // Используем JsonDocument для надёжного разбора ответа mfssia.
+            // Формат: { "data": { "UAL": "did:dkg:..." } } или { "UAL": "did:dkg:..." }
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("data", out var dataEl) &&
+                dataEl.ValueKind == JsonValueKind.Object &&
+                dataEl.TryGetProperty("UAL", out var nestedUal))
+                return nestedUal.GetString();
+
+            if (root.TryGetProperty("UAL", out var topUal))
+                return topUal.GetString();
+
+            return null;
         }
         catch
         {
-            return null; // DKG publish failure is non-fatal for local storage
+            return null; // Ошибка DKG не блокирует сохранение результата
         }
     }
-
-    private record DkgData(string? UAL);
-    private record DkgResponse(string? UAL, DkgData? Data);
 }
