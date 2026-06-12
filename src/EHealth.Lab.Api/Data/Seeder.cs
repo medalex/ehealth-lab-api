@@ -4,7 +4,7 @@ namespace EHealth.Lab.Data;
 
 public static class Seeder
 {
-    // pat1 = 00000000-0000-0000-0000-000000000001 (Anna Koval)
+    // pat1 = 00000000-0000-0000-0000-000000000001 (Emily Carter)
     private static readonly Guid Pat1 = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     public static void Seed(AppDbContext db)
@@ -20,7 +20,7 @@ public static class Seeder
             Formula = EGfrFormula.CkdEpi,
             Value = 45,
             Unit = "mL/min/1.73m²",
-            MeasuredBy = "DiagLab1",
+            MeasuredBy = "CityMed Lab",
             MeasuredAt = DateTime.UtcNow.AddDays(-5)
         };
         r1.LeafHash = LabResult.ComputeLeafHash(r1.Id, r1.PatientId, r1.LoincCode, r1.Value, r1.Unit);
@@ -35,7 +35,7 @@ public static class Seeder
             Formula = EGfrFormula.CockcroftGault,
             Value = 52,
             Unit = "mL/min",
-            MeasuredBy = "DiagLab1",
+            MeasuredBy = "CityMed Lab",
             MeasuredAt = DateTime.UtcNow.AddDays(-5)
         };
         r2.LeafHash = LabResult.ComputeLeafHash(r2.Id, r2.PatientId, r2.LoincCode, r2.Value, r2.Unit);
