@@ -1,12 +1,13 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG TARGETARCH
 WORKDIR /src
 
 COPY src/EHealth.Lab.Api/EHealth.Lab.Api.csproj EHealth.Lab.Api/
-RUN dotnet restore EHealth.Lab.Api/EHealth.Lab.Api.csproj
+RUN dotnet restore EHealth.Lab.Api/EHealth.Lab.Api.csproj -a $TARGETARCH
 
 COPY src/EHealth.Lab.Api/ EHealth.Lab.Api/
 RUN dotnet publish EHealth.Lab.Api/EHealth.Lab.Api.csproj \
-    -c Release -o /out --no-restore
+    -c Release -o /out --no-restore -a $TARGETARCH
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
