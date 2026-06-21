@@ -28,7 +28,7 @@ public static class LabResultEndpoints
         group.MapPost("/", async (LabResult result, AppDbContext db,
             IHttpClientFactory http, IConfiguration config) =>
         {
-            // Проверяем consent пациента на доступ лаборатории к его данным
+            // Check patient consent for lab data access
             var orgId = config["LabOrganizationId"] ?? "lab-1";
             if (!await CheckConsent(result.PatientId, orgId, http, config))
                 return Results.Json(
@@ -113,8 +113,8 @@ public static class LabResultEndpoints
 
             if (!response.IsSuccessStatusCode) return null;
 
-            // Используем JsonDocument для надёжного разбора ответа mfssia.
-            // Формат: { "data": { "UAL": "did:dkg:..." } } или { "UAL": "did:dkg:..." }
+            // Use JsonDocument for reliable mfssia response parsing.
+            // Format: { "data": { "UAL": "did:dkg:..." } } or { "UAL": "did:dkg:..." }
             var body = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
@@ -131,7 +131,7 @@ public static class LabResultEndpoints
         }
         catch
         {
-            return null; // Ошибка DKG не блокирует сохранение результата
+            return null; // DKG error does not block result persistence
         }
     }
 }
