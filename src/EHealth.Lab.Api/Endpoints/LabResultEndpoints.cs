@@ -91,24 +91,30 @@ public static class LabResultEndpoints
             // Patient identity is kept off-chain (paper §3.3, R4 Witness confidentiality).
             // The leafHash commits Id + PatientId + LoincCode + Value + Unit so the ZKP
             // circuit can verify Merkle membership in root_M without exposing the patient.
-            // JSON-LD so the lab result is queryable in the DKG graph (raw Turtle is not parsed).
+            // JSON-LD aligned to the rx: ontology TBox (rx:LabResult: hasPatient/hasSource as
+            // IRIs, hasMetric literal, hasValue decimal, hasTimestamp; leafHash kept for the ZKP commitment).
+            var sourceSlug = result.MeasuredBy.Trim().Replace(" ", "-").ToLowerInvariant();
             var response = await client.PostAsJsonAsync($"{mfssiaUrl}/rdf/jsonld", new
             {
                 id = $"urn:lab:result:{result.Id}",
                 type = "LabResult",
+                iris = new Dictionary<string, string>
+                {
+                    ["hasPatient"] = $"urn:patient:{result.PatientId}",
+                    ["hasSource"] = $"urn:org:{sourceSlug}",
+                },
                 literals = new Dictionary<string, string>
                 {
-                    ["loincCode"] = result.LoincCode,
-                    ["conditionType"] = result.Metric,
-                    ["formula"] = result.Formula.ToString(),
-                    ["clinicalValue"] = result.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    ["unit"] = result.Unit,
-                    ["measuredBy"] = result.MeasuredBy,
+                    ["hasMetric"] = result.Metric,
                     ["leafHash"] = result.LeafHash,
+                },
+                decimals = new Dictionary<string, string>
+                {
+                    ["hasValue"] = result.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 },
                 dateTimes = new Dictionary<string, string>
                 {
-                    ["measuredAt"] = result.MeasuredAt.ToUniversalTime().ToString("O"),
+                    ["hasTimestamp"] = result.MeasuredAt.ToUniversalTime().ToString("O"),
                 },
             });
 
