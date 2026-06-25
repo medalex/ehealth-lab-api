@@ -91,25 +91,26 @@ public static class LabResultEndpoints
             // Patient identity is kept off-chain (paper §3.3, R4 Witness confidentiality).
             // The leafHash commits Id + PatientId + LoincCode + Value + Unit so the ZKP
             // circuit can verify Merkle membership in root_M without exposing the patient.
-            var turtle = $"""
-                @prefix rx: <https://mfssia.io/ontology/prescription#> .
-                @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-                @prefix loinc: <https://loinc.org/> .
-
-                <urn:lab:result:{result.Id}> a rx:LabResult ;
-                    rx:loincCode loinc:{result.LoincCode} ;
-                    rx:conditionType "{result.Metric}" ;
-                    rx:formula "{result.Formula}" ;
-                    rx:clinicalValue "{result.Value}"^^xsd:decimal ;
-                    rx:unit "{result.Unit}" ;
-                    rx:measuredBy "{result.MeasuredBy}" ;
-                    rx:measuredAt "{result.MeasuredAt:O}"^^xsd:dateTime ;
-                    rx:leafHash "{result.LeafHash}" .
-                """;
-
-            var response = await client.PostAsync(
-                $"{mfssiaUrl}/rdf",
-                new StringContent(turtle, System.Text.Encoding.UTF8, "text/turtle"));
+            // JSON-LD so the lab result is queryable in the DKG graph (raw Turtle is not parsed).
+            var response = await client.PostAsJsonAsync($"{mfssiaUrl}/rdf/jsonld", new
+            {
+                id = $"urn:lab:result:{result.Id}",
+                type = "LabResult",
+                literals = new Dictionary<string, string>
+                {
+                    ["loincCode"] = result.LoincCode,
+                    ["conditionType"] = result.Metric,
+                    ["formula"] = result.Formula.ToString(),
+                    ["clinicalValue"] = result.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["unit"] = result.Unit,
+                    ["measuredBy"] = result.MeasuredBy,
+                    ["leafHash"] = result.LeafHash,
+                },
+                dateTimes = new Dictionary<string, string>
+                {
+                    ["measuredAt"] = result.MeasuredAt.ToUniversalTime().ToString("O"),
+                },
+            });
 
             if (!response.IsSuccessStatusCode) return null;
 
