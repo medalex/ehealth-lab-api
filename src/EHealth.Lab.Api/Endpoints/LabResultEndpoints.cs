@@ -106,6 +106,10 @@ public static class LabResultEndpoints
                 literals = new Dictionary<string, string>
                 {
                     ["hasMetric"] = result.Metric,
+                    // Reporting unit — the semantic-conflict trigger. Two labs reporting the
+                    // same metric in different units surface as a numeric conflict when the
+                    // hospital assembles the prescription (normalize → DAO escalation).
+                    ["hasUnit"] = result.Unit,
                     ["leafHash"] = result.LeafHash,
                 },
                 decimals = new Dictionary<string, string>
