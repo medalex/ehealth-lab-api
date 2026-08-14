@@ -16,9 +16,32 @@ public class LabResultEndpointsTests : IDisposable
         _client = _factory.CreateClient();
     }
 
-    [Fact]
-    public async Task GetAllResults_ReturnsSeededRecords()
+    // Nothing is seeded — lab results are entered live during the demo — so every test
+    // that needs a record creates it first.
+    private async Task<LabResult> CreateResult(
+        Guid patientId, string loincCode = "33914-3", string metric = "eGFR", decimal value = 60)
     {
+        var response = await _client.PostAsJsonAsync("/api/results", new LabResult
+        {
+            PatientId = patientId,
+            LoincCode = loincCode,
+            Metric = metric,
+            Formula = EGfrFormula.CkdEpi,
+            Value = value,
+            Unit = "mL/min/1.73m²",
+            MeasuredBy = "TestLab",
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<LabResult>())!;
+    }
+
+    [Fact]
+    public async Task GetAllResults_ReturnsCreatedRecords()
+    {
+        await CreateResult(PatientId);
+        await CreateResult(Guid.NewGuid());
+
         var response = await _client.GetAsync("/api/results");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -28,14 +51,19 @@ public class LabResultEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task GetResultsByPatient_ReturnsSeededRecords()
+    public async Task GetResultsByPatient_ReturnsOnlyThatPatientsRecords()
     {
+        await CreateResult(PatientId);
+        await CreateResult(PatientId, loincCode: "2164-2", metric: "Creatinine Clearance");
+        await CreateResult(Guid.NewGuid());
+
         var response = await _client.GetAsync($"/api/results/patient/{PatientId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var results = await response.Content.ReadFromJsonAsync<List<LabResult>>();
         Assert.NotNull(results);
         Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.Equal(PatientId, r.PatientId));
     }
 
     [Fact]
@@ -51,14 +79,13 @@ public class LabResultEndpointsTests : IDisposable
     [Fact]
     public async Task GetResultById_ReturnsRecord()
     {
-        var seeded = await _client.GetFromJsonAsync<List<LabResult>>($"/api/results/patient/{PatientId}");
-        var id = seeded![0].Id;
+        var created = await CreateResult(PatientId);
 
-        var response = await _client.GetAsync($"/api/results/{id}");
+        var response = await _client.GetAsync($"/api/results/{created.Id}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<LabResult>();
-        Assert.Equal(id, result!.Id);
+        Assert.Equal(created.Id, result!.Id);
     }
 
     [Fact]
@@ -72,22 +99,8 @@ public class LabResultEndpointsTests : IDisposable
     [Fact]
     public async Task PostResult_CreatesRecord_WithLeafHash()
     {
-        var newResult = new LabResult
-        {
-            PatientId = PatientId,
-            LoincCode = "33914-3",
-            Metric = "eGFR",
-            Formula = EGfrFormula.CkdEpi,
-            Value = 60,
-            Unit = "mL/min/1.73m²",
-            MeasuredBy = "TestLab"
-        };
+        var created = await CreateResult(PatientId);
 
-        var response = await _client.PostAsJsonAsync("/api/results", newResult);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var created = await response.Content.ReadFromJsonAsync<LabResult>();
-        Assert.NotNull(created);
         Assert.NotEqual(Guid.Empty, created.Id);
         Assert.NotNull(created.LeafHash);
         Assert.Equal(64, created.LeafHash.Length); // SHA-256 hex = 64 chars
@@ -97,30 +110,18 @@ public class LabResultEndpointsTests : IDisposable
     public async Task PostResult_LeafHash_DoesNotContainPatientId()
     {
         // The leafHash must be an opaque hex string with no patient identity embedded
-        var newResult = new LabResult
-        {
-            PatientId = PatientId,
-            LoincCode = "2164-2",
-            Metric = "Creatinine Clearance",
-            Formula = EGfrFormula.CockcroftGault,
-            Value = 55,
-            Unit = "mL/min",
-            MeasuredBy = "TestLab"
-        };
+        var created = await CreateResult(
+            PatientId, loincCode: "2164-2", metric: "Creatinine Clearance", value: 55);
 
-        var response = await _client.PostAsJsonAsync("/api/results", newResult);
-        var created = await response.Content.ReadFromJsonAsync<LabResult>();
-
-        Assert.DoesNotContain(PatientId.ToString(), created!.LeafHash!);
+        Assert.DoesNotContain(PatientId.ToString(), created.LeafHash!);
     }
 
     [Fact]
     public async Task DeleteResult_KnownId_ReturnsNoContent()
     {
-        var results = await _client.GetFromJsonAsync<List<LabResult>>($"/api/results/patient/{PatientId}");
-        var id = results![0].Id;
+        var created = await CreateResult(PatientId);
 
-        var response = await _client.DeleteAsync($"/api/results/{id}");
+        var response = await _client.DeleteAsync($"/api/results/{created.Id}");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
