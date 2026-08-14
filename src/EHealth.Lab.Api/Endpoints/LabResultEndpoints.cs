@@ -85,7 +85,7 @@ public static class LabResultEndpoints
     {
         try
         {
-            var mfssiaUrl = config["MfssiaUrl"] ?? "http://mfssia-ehealth:4000/api";
+            var mfssiaUrl = Mfssia.BaseUrl(config);
             var client = http.CreateClient();
 
             // Patient identity is kept off-chain (paper §3.3, R4 Witness confidentiality).
