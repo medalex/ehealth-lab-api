@@ -116,9 +116,8 @@ public static class LabResultEndpoints
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
-            if (root.TryGetProperty("data", out var dataEl) &&
-                dataEl.ValueKind == JsonValueKind.Object &&
-                dataEl.TryGetProperty("UAL", out var nestedUal))
+            if (Mfssia.TryUnwrap(root, out var data) &&
+                data.TryGetProperty("UAL", out var nestedUal))
                 return nestedUal.GetString();
 
             if (root.TryGetProperty("UAL", out var topUal))
